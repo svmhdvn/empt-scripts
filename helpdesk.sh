@@ -87,15 +87,6 @@ EOF
 # * Create a group-private IRC channel (possibly with a shared password)
 # * Ensure that a group is not created with the same name as a user just for sanity
 
-groups_usage() {
-    cat <<EOF
-usage:
-    groups list
-    groups invite <groupname>
-    groups quota <groupname> <newquota>
-EOF
-}
-
 groups_list() {
     groups="$(jexec -l cifs groups "${from_user}")"
 
@@ -237,6 +228,15 @@ Group '${group_name}' now has a maximum storage allowance of ${2} GiB.
 EOF
 }
 
+groups_usage() {
+    cat <<EOF
+usage:
+    groups list
+    groups invite <groupname>
+    groups quota <groupname> <newquota>
+EOF
+}
+
 helpdesk_groups() {
     case "$1" in
         list|show) groups_list ;;
@@ -257,7 +257,6 @@ helpdesk_usage() {
     _helpdesk_reply <<EOF
 EOF
 }
-
 
 # =============================================================================
 # HELPDESK TRIAGE
@@ -280,7 +279,7 @@ while getopts c:f:m:r:s: flag; do
             subject="${OPTARG}"
             ;;
         *)
-            echo "$0: ERROR: unknown flag '${flag}'" >&2
+            echo "helpdesk: ERROR: unknown flag '${flag}'" >&2
             usage >&2
             exit 64 # EX_USAGE
     esac
