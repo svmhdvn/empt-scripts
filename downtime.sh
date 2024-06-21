@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eu
 
 _usage() {
     cat <<EOF
@@ -52,7 +53,7 @@ case "$1" in
     failover) _failover ;;
     takeover) _takeover ;;
     *)
-        echo "unrecognized action: '$1'" >&2
+        echo "$0: ERROR: unrecognized action: '$1'" >&2
         _usage >&2
         exit 64 # EX_USAGE
 esac

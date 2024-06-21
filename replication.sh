@@ -1,14 +1,14 @@
 #!/bin/sh
-
-set -e
+set -eu
 
 zfscmd="doas -u zfsemptoperator /sbin/zfs"
-readonly zfscmd
 
 _usage() {
     cat <<EOF
 usage:
-    replication.sh init|backup
+    $0 init
+    $0 backup
+    $0 clean
 EOF
 }
 
@@ -87,7 +87,7 @@ case "$1" in
     backup) _backup ;;
     clean) _clean ;;
     *)
-        echo "unrecognized action: '$1'" >&2
+        echo "$0: ERROR: unrecognized action: '$1'" >&2
         _usage >&2
         exit 64 # EX_USAGE
 esac

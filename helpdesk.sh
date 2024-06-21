@@ -20,11 +20,11 @@ _helpdesk_reply() {
     # TODO figure out the proper way to use DMA without using the absolute command
     {
         cat <<EOF
-To: ${HELPDESK_FROM}
-Subject: [HELPDESK] Re: ${HELPDESK_SUBJECT}
-In-Reply-To: ${HELPDESK_MESSAGE_ID}
-References: ${HELPDESK_REFERENCES} ${HELPDESK_MESSAGE_ID}
-${HELPDESK_CC:+Cc: "${HELPDESK_CC}"}
+To: ${from}
+Subject: [HELPDESK] Re: ${subject}
+In-Reply-To: ${message_id}
+References: ${references} ${message_id}
+${cc:+Cc: "${cc}"}
 
 EOF
         cat
@@ -49,8 +49,8 @@ EOF
 }
 
 _groups_storage() {
-    for g in $(jexec -l cifs groups "${HELPDESK_FROM_USER}"); do
-        test "${g}" = "${HELPDESK_FROM_USER}" && continue
+    for g in $(jexec -l cifs groups "${from_user}"); do
+        test "${g}" = "${from_user}" && continue
         quota="$(_display_dataset_quota "zroot/empt/synced/rw/group:${g}")"
         echo "  ${g} = ${quota}"
     done
@@ -64,7 +64,7 @@ EOF
 }
 
 helpdesk_dashboard() {
-    user_quota="$(_display_dataset_quota zroot/empt/synced/rw/human:${HELPDESK_FROM_USER})"
+    user_quota="$(_display_dataset_quota "zroot/empt/synced/rw/human:${from_user}")"
     group_quotas="$(_groups_storage)"
 
     _helpdesk_reply <<EOF
@@ -90,17 +90,14 @@ EOF
 groups_usage() {
     cat <<EOF
 usage:
-    groups.sh list
-    groups.sh invite <groupname>
-    groups.sh quota <groupname> <newquota>
-
-environment: HELPDESK_*
+    groups list
+    groups invite <groupname>
+    groups quota <groupname> <newquota>
 EOF
 }
 
 groups_list() {
-    groups="$(jexec -l cifs groups "${HELPDESK_FROM_USER}")"
-    readonly groups
+    groups="$(jexec -l cifs groups "${from_user}")"
 
     _helpdesk_reply <<EOF
 You are a part of these groups:
@@ -112,7 +109,6 @@ EOF
 groups_invite() {
     # Take the new group name as the last word of the subject line
     group_name="$1"
-    readonly group_name
 
     # If the group doesn't exist, then get the next available GID
     if shown_group="$(jexec -l cifs pw groupshow "${group_name}" -q)"; then
@@ -120,7 +116,6 @@ groups_invite() {
     else
         group_gid="$(jexec -l cifs pw groupnext)"
     fi
-    readonly group_gid
 
     for j in cifs radicale; do
         # TODO idempotency
@@ -151,7 +146,6 @@ EOF
 
     # Set the upstream mail relayhost
     mail_jid="$(jls -j mail jid)"
-    readonly mail_jid
     echo "fe80::eeee:${mail_jid}%lo0" | jexec -l -U mlmmj mail tee "/var/spool/mlmmj/${group_name}/control/relayhost"
 
     # Ensure that users cannot sub/unsub directly from the mailinglist
@@ -166,10 +160,7 @@ EOF
 
     # Create a storage dataset for the group and mount it in corresponding jails
     # ==========================================================================
-
-    # TODO do we need a reservation? I don't think so
     group_mount="/empt/synced/rw/groups/${group_name}"
-    readonly group_mount
 
     zfs create -p \
         -o quota=1G \
@@ -183,9 +174,7 @@ EOF
 
     # Mount the group storage in cifs
     cifs_mount_src="${group_mount}/home"
-    readonly cifs_mount_src
     cifs_mount_dst="/empt/jails/cifs/groups/${group_name}"
-    readonly cifs_mount_dst
     _append_if_missing "${cifs_mount_src} ${cifs_mount_dst} nullfs rw 0 0" /empt/synced/rw/fstab.d/cifs.fstab
     # TODO idempotency and proper error handling
     mount -t nullfs "${cifs_mount_src}" "${cifs_mount_dst}" 2>/dev/null || true
@@ -197,23 +186,21 @@ EOF
 
     # Invite the users to all of the groups' resources
     # ================================================
-    other_members="$(echo "${HELPDESK_CC}" | _address_list_to_usernames)"
-    readonly other_members
+    other_members="$(echo "${cc}" | _address_list_to_usernames)"
 
-    comma_separated_members="$(printf '%s\n%s\n' "${HELPDESK_FROM_USER}" "${other_members}" | paste -s -d, -)"
-    readonly comma_separated_members
+    comma_separated_members="$(printf '%s\n%s\n' "${from_user}" "${other_members}" | paste -s -d, -)"
 
     for j in cifs radicale; do
         jexec -l "${j}" pw groupmod -n "${group_name}" -m "${comma_separated_members}" -q || true
     done
 
-    for u in ${HELPDESK_FROM_USER} ${other_members}; do
+    for u in ${from_user} ${other_members}; do
         jexec -l -U mlmmj mail /usr/local/bin/mlmmj-sub -L "/var/spool/mlmmj/${group_name}" -a "${u}@empt.siva" -cfs
     done
     # ================================================
 
     # create a welcome file
-    jexec -l cifs install -o "${HELPDESK_FROM_USER}" -g "${group_name}" -m 0660 /dev/null "/groups/${group_name}/WELCOME.txt"
+    jexec -l cifs install -o "${from_user}" -g "${group_name}" -m 0660 /dev/null "/groups/${group_name}/WELCOME.txt"
     echo "Welcome to the '${group_name}' group!" > "${cifs_mount_src}/WELCOME.txt"
 
     _helpdesk_reply <<EOF
@@ -230,7 +217,6 @@ EOF
 groups_quota() {
     # Ensure the group dataset exists
     group_dataset="zroot/empt/synced/rw/group:$1"
-    readonly group_dataset
     if ! zfs list -H -o name "${group_dataset}"; then
         echo "$0: ERROR: nonexistent dataset for group '$1'" >&2
         exit 65 # EX_DATAERR
@@ -239,8 +225,10 @@ groups_quota() {
     # Ensure that the requested quota is a whole number
     case "$2" in
         ''|0*|*[!0-9]*)
-            echo "$0: ERROR: invalid requested quota '$2'" >&2
+            echo "helpdesk groups quota: ERROR: invalid requested quota '$2'" >&2
             exit 65 # EX_DATAERR
+            ;;
+        *) ;; # valid
     esac
 
     zfs set "quota=${2}G" "${group_dataset}"
@@ -251,12 +239,12 @@ EOF
 
 helpdesk_groups() {
     case "$1" in
-        list|show) _list ;;
-        create|invite|form) _invite "$2" ;;
-        quota) _quota "$2" "$3" ;;
+        list|show) groups_list ;;
+        create|invite|form) groups_invite "$2" ;;
+        quota) groups_quota "$2" "$3" ;;
         *)
-            echo "$0: ERROR: invalid verb '$1'" >&2
-            _usage >&2
+            echo "helpdesk groups: ERROR: invalid action '$1'" >&2
+            groups_usage >&2
             exit 64 # EX_USAGE
     esac
 }
@@ -272,7 +260,7 @@ EOF
 
 
 # =============================================================================
-# HELPDESK MAIN
+# HELPDESK TRIAGE
 # =============================================================================
 while getopts c:f:m:r:s: flag; do
     case "${flag}" in
@@ -300,7 +288,7 @@ done
 
 from_user="$(echo "${from}" | _address_list_to_usernames)"
 if test -z "${from_user}"; then
-    echo "$0: ERROR: invalid flag value -f '${from}'" >&2
+    echo "helpdesk: ERROR: invalid flag value -f '${from}'" >&2
     usage >&2
     exit 64 # EX_USAGE
 fi
