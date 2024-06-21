@@ -9,11 +9,12 @@ BINS = $(SOURCES:.sh=)
 
 build: $(BINS)
 
+#for f in $(BINS); do \
+# install -m 0755 "$${f}" $(DESTDIR)$(PREFIX)/libexec/empt; \
+#done
 install: $(BINS)
 	mkdir -p $(DESTDIR)$(PREFIX)/libexec/empt
-	@for f in $(BINS); do \
-	 install -o root -g wheel -m 0755 $f $(DESTDIR)$(PREFIX)/libexec/empt; \
-	done
+	install -m 0755 $(BINS) $(DESTDIR)$(PREFIX)/libexec/empt
 
 .sh:
 	shellcheck -o all $<
