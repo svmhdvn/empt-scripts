@@ -18,3 +18,7 @@ test: $(BINS)
 
 clean:
 	rm -f $(BINS)
+
+.sh:
+	cp $< $@
+	chmod a+x $@
