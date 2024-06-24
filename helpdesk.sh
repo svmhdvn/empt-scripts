@@ -16,6 +16,36 @@ _append_if_missing() {
     grep -qxF "$1" "$2" || echo "$1" >> "$2"
 }
 
+# $1 = resource type (either 'user' or 'group')
+# $2 = resource name
+# $3 = requested quota (in whole GiB units)
+_change_quota() {
+    case "$1" in
+        user|group) ;;
+        *)
+            echo "$0: ERROR: invalid resource type '$1'" >&2
+            exit 65 # EX_DATAERR
+    esac
+
+    # Ensure the group dataset exists
+    dataset="zroot/empt/synced/rw/$1:$2"
+    if ! zfs list -H -o name "${dataset}"; then
+        echo "ERROR: nonexistent dataset for $1 '$2'" >&2
+        exit 65 # EX_DATAERR
+    fi
+
+    # Ensure that the requested quota is a whole number
+    case "$3" in
+        ''|0*|*[!0-9]*)
+            echo "$0: ERROR: invalid requested quota '$3' for $1 '$2'" >&2
+            exit 65 # EX_DATAERR
+            ;;
+        *) ;; # valid
+    esac
+
+    zfs set "quota=${3}G" "${dataset}"
+}
+
 _helpdesk_reply() {
     # TODO figure out the proper way to use DMA without using the absolute command
     {
@@ -48,7 +78,7 @@ EOF
     printf "${used_pretty} / ${available_pretty} ($((used_raw * 100 / available_raw))%)"
 }
 
-_groups_storage() {
+_display_groups_storage() {
     for g in $(jexec -l cifs groups "${from_user}"); do
         test "${g}" = "${from_user}" && continue
         quota="$(_display_dataset_quota "zroot/empt/synced/rw/group:${g}")"
@@ -65,7 +95,7 @@ EOF
 
 helpdesk_dashboard() {
     user_quota="$(_display_dataset_quota "zroot/empt/synced/rw/human:${from_user}")"
-    group_quotas="$(_groups_storage)"
+    group_quotas="$(_display_groups_storage)"
 
     _helpdesk_reply <<EOF
 DASHBOARD
@@ -206,25 +236,9 @@ EOF
 # TODO if IT has already moderated and checked this request manually, does it
 # matter that we do all this input validation programmatically?
 groups_quota() {
-    # Ensure the group dataset exists
-    group_dataset="zroot/empt/synced/rw/group:$1"
-    if ! zfs list -H -o name "${group_dataset}"; then
-        echo "$0: ERROR: nonexistent dataset for group '$1'" >&2
-        exit 65 # EX_DATAERR
-    fi
-
-    # Ensure that the requested quota is a whole number
-    case "$2" in
-        ''|0*|*[!0-9]*)
-            echo "helpdesk groups quota: ERROR: invalid requested quota '$2'" >&2
-            exit 65 # EX_DATAERR
-            ;;
-        *) ;; # valid
-    esac
-
-    zfs set "quota=${2}G" "${group_dataset}"
+    _change_quota group "$1" "$2"
     _helpdesk_reply <<EOF
-Group '${group_name}' now has a maximum storage allowance of ${2} GiB.
+Group '$2' now has $3 GiB of storage.
 EOF
 }
 
