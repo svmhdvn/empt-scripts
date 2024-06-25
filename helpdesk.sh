@@ -54,7 +54,7 @@ To: ${from}
 Subject: [HELPDESK] Re: ${subject}
 In-Reply-To: ${message_id}
 References: ${references} ${message_id}
-${cc:+Cc: "${cc}"}
+${cc:+Cc: ${cc}}
 
 EOF
         cat
@@ -75,11 +75,13 @@ EOF
     read -r used_raw available_raw <<EOF
 ${raw_props}
 EOF
-    printf "${used_pretty} / ${available_pretty} ($((used_raw * 100 / available_raw))%)"
+    echo "${used_pretty} / ${available_pretty} ($((used_raw * 100 / available_raw))%)"
 }
 
 _display_groups_storage() {
-    for g in $(jexec -l cifs groups "${from_user}"); do
+    groups="$(jexec -l cifs groups "${from_user}")"
+    sorted_groups="$(echo "${groups}" | xargs -n1 | sort)"
+    for g in ${sorted_groups}; do
         test "${g}" = "${from_user}" && continue
         quota="$(_display_dataset_quota "zroot/empt/synced/rw/group:${g}")"
         echo "  ${g} = ${quota}"
