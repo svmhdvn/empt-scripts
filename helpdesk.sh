@@ -191,7 +191,8 @@ EOF
         "zroot/empt/synced/rw/group:${group_name}"
 
     # Create the data and mountpoint directories
-    for d in "${group_mount}/home" "${group_mount}/diary" "/empt/jails/cifs/groups/${group_name}"; do
+    # TODO think about adding other useful shared resources here, such as a shared calendar
+    for d in "${group_mount}/home" "/empt/jails/cifs/groups/${group_name}"; do
         install -d -o root -g "${group_gid}" -m 1770 "${d}"
     done
 
