@@ -111,8 +111,5 @@ case "$1" in
         _usage >&2
         rc=64 # EX_USAGE
 esac
-
-if test "${rc}" -ne 0; then
-    _print_report
-    exit "${rc}"
-fi
+_print_report
+exit "${rc}"
