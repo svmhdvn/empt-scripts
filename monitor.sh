@@ -4,14 +4,12 @@
 # with error
 set -u
 
+# TODO remove traces of siva
 # TODO monitoring tasks
 #
 # Every minute:
 # * check IMAP and SMTP availability
 # * check IRC availability
-#
-# Every day:
-# * check TLS cert expiry
 #
 # Every week or month:
 # * check S.M.A.R.T. status on storage drives
@@ -50,9 +48,38 @@ _every_hour() {
     echo
 
     # TODO finish
-    #_print_check_header "TLS cert validity on all active ports"
-    #openssl s_client -connect mail.empt.siva:465 -verify_return_error -x509_strict -verify_hostname mail.empt.siva < /dev/null
-    #echo
+    # NOTE auth_level=3 disallows public keys < 256 bits
+    # auth_level=4 seems optimal, but not sure about performance
+    # suiteB_128_only forces ECC P-256
+    tls_services="mail.empt.siva 465
+mail.empt.siva 993
+irc.empt.siva 443
+irc.empt.siva 6697"
+    _print_check_header "TLS cert validity on all active ports"
+    while read -r host port; do
+        cert="$(openssl s_client \
+            -verify_return_error \
+            -x509_strict \
+            -auth_level 3 \
+            -suiteB_128_only \
+            -verify_hostname "${host}" \
+            "${host}:${port}" < /dev/null 2>/dev/null)"
+        if test "$?" -eq 0; then
+            # Warn on expiry in the next 30 days
+            if echo "${cert}" | openssl x509 -checkend 2592000 >/dev/null; then
+                echo "TLS certificate for '${host}:${port}' is valid."
+            else
+                echo "PROBLEM: TLS certificate for '${host}:${port}' expires soon"
+                rc=69 # EX_UNAVAILABLE
+            fi
+        else
+            echo "PROBLEM: TLS certificate for '${host}:${port}' does not pass verification checks"
+            rc=69 # EX_UNAVAILABLE
+        fi
+    done <<EOF
+${tls_services}
+EOF
+    echo
 }
 
 _every_day() {
