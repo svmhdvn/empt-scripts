@@ -12,7 +12,6 @@ set -u
 #
 # Every day:
 # * check TLS cert expiry
-# * monitor the uptime in some way if possible, ensure no sporadic reboots
 #
 # Every week or month:
 # * check S.M.A.R.T. status on storage drives
@@ -21,14 +20,19 @@ set -u
 
 _every_minute() {
     _print_check_header "system load average"
-    if ! /usr/local/libexec/nagios/check_load -r -w 0.90 -c 0.95; then
+    loadavg="$(sysctl -n vm.loadavg | awk '{ print $2*100, $3*100, $4*100 }')"
+    read -r l1 l5 l15 <<EOF
+${loadavg}
+EOF
+    if test "${l1}" -gt 90 -o "${l5}" -gt 90 -o "${l15}" -gt 90; then
         echo "PROBLEM: system load average exceeds threshold"
         rc=69 # EX_UNAVAILABLE
     fi
     echo
 
     _print_check_header "swap memory usage"
-    if ! /usr/local/libexec/nagios/check_swap -w 90% -c 50%; then
+    swap_utilization="$(swapinfo | awk 'END { print(substr($5, 0, length($5)-1)) }')"
+    if test "${swap_utilization}" -gt 10; then
         echo "PROBLEM: swap memory usage exceeds threshold"
         rc=69 # EX_UNAVAILABLE
     fi
@@ -44,6 +48,11 @@ _every_hour() {
         rc=69 # EX_UNAVAILABLE
     fi
     echo
+
+    # TODO finish
+    #_print_check_header "TLS cert validity on all active ports"
+    #openssl s_client -connect mail.empt.siva:465 -verify_return_error -x509_strict -verify_hostname mail.empt.siva < /dev/null
+    #echo
 }
 
 _every_day() {
@@ -109,7 +118,7 @@ case "$1" in
     *)
         echo "$0: ERROR: unrecognized interval '$1'" >&2
         _usage >&2
-        rc=64 # EX_USAGE
+        exit 64 # EX_USAGE
 esac
 _print_report
 exit "${rc}"
