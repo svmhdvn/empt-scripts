@@ -16,12 +16,12 @@ _append_if_missing() {
     grep -qxF "$1" "$2" || echo "$1" >> "$2"
 }
 
-# $1 = resource type (either 'user' or 'group')
+# $1 = resource type (either 'human' or 'group')
 # $2 = resource name
 # $3 = requested quota (in whole GiB units)
 _change_quota() {
     case "$1" in
-        user|group) ;;
+        human|group) ;;
         *)
             echo "$0: ERROR: invalid resource type '$1'" >&2
             exit 65 # EX_DATAERR
@@ -47,7 +47,6 @@ _change_quota() {
 }
 
 _helpdesk_reply() {
-    # TODO figure out the proper way to use DMA without using the absolute command
     {
         cat <<EOF
 To: ${from}
@@ -115,7 +114,6 @@ EOF
 # =============================================================================
 
 # TODO
-# * Create a shared calendar
 # * Create a group-private IRC channel (possibly with a shared password)
 # * Ensure that a group is not created with the same name as a user just for sanity
 
@@ -155,7 +153,7 @@ groups_invite() {
 SPOOLDIR='/var/spool/mlmmj'
 LISTNAME='${group_name}'
 FQDN='empt.siva'
-OWNER='postmaster@empt.siva'
+OWNER='it@empt.siva'
 TEXTLANG='en'
 ADDALIAS='n'
 DO_CHOWN='n'
@@ -203,9 +201,6 @@ EOF
     # TODO idempotency and proper error handling
     mount -t nullfs "${cifs_mount_src}" "${cifs_mount_dst}" 2>/dev/null || true
 
-    # TODO radicale
-    # ==========================================================================
-
     # TODO join the user to the IRC channel and subscribe the IRC logging bot
 
     # Invite the users to all of the groups' resources
@@ -241,7 +236,7 @@ EOF
 groups_quota() {
     _change_quota group "$1" "$2"
     _helpdesk_reply <<EOF
-Group '$2' now has $3 GiB of storage.
+Group '$1' now has $2 GiB of storage available.
 EOF
 }
 
@@ -267,6 +262,41 @@ helpdesk_groups() {
 }
 
 # =============================================================================
+# MYSELF (HUMANS)
+# =============================================================================
+
+# $1 = requested quota (in whole number GiB units)
+# Assumes that IT has already verified that there is enough storage to support
+# this request
+# TODO if IT has already moderated and checked this request manually, does it
+# matter that we do all this input validation programmatically?
+myself_quota() {
+    _change_quota human "${from_user}" "$1"
+    _helpdesk_reply <<EOF
+You now have $1 GiB of storage available.
+EOF
+}
+
+myself_usage() {
+    cat <<EOF
+usage:
+    myself reserve <newquota>
+EOF
+}
+
+# $1 = action
+# $2 = param1
+helpdesk_myself() {
+    case "$1" in
+        reserve) myself_quota "$2" ;;
+        *)
+            echo "helpdesk myself: ERROR: invalid action '$1'" >&2
+            myself_usage >&2
+            exit 64 # EX_USAGE
+    esac
+}
+
+# =============================================================================
 # HELPDESK USAGE GUIDE
 # =============================================================================
 
@@ -280,21 +310,11 @@ EOF
 # =============================================================================
 while getopts c:f:m:r:s: flag; do
     case "${flag}" in
-        c)
-            cc="${OPTARG}"
-            ;;
-        f)
-            from="${OPTARG}"
-            ;;
-        m)
-            message_id="${OPTARG}"
-            ;;
-        r)
-            references="${OPTARG}"
-            ;;
-        s)
-            subject="${OPTARG}"
-            ;;
+        c) cc="${OPTARG}" ;;
+        f) from="${OPTARG}" ;;
+        m) message_id="${OPTARG}" ;;
+        r) references="${OPTARG}" ;;
+        s) subject="${OPTARG}" ;;
         *)
             echo "helpdesk: ERROR: unknown flag '${flag}'" >&2
             usage >&2
@@ -321,6 +341,9 @@ case "${object}" in
         ;;
     dashboard)
         helpdesk_dashboard
+        ;;
+    myself)
+        helpdesk_myself "${verb}" "${param1}"
         ;;
     *)
         helpdesk_usage
