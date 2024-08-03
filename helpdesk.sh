@@ -43,7 +43,13 @@ _change_quota() {
         *) ;; # valid
     esac
 
-    zfs set "quota=${3}G" "${dataset}"
+    # Groups are ephemeral and really easy to create, so we don't apply a reservation
+    # to avoid unnecessarily taking up valuable storage.
+    if test "$1" = human; then
+        zfs set "quota=${3}G" "reservation=${3}G" "${dataset}"
+    else
+        zfs set "quota=${3}G" "${dataset}"
+    fi
 }
 
 _helpdesk_reply() {
@@ -149,7 +155,7 @@ groups_invite() {
     if ! test -d "/var/spool/mlmmj/${group_name}"; then
         # TODO remove need for answer file
         # TODO fix owner and figure out how that's going to work
-        cat > /empt/jails/mail/tmp/mlmmj-answers.txt <<EOF
+        cat > /empt/jails/smtp/tmp/mlmmj-answers.txt <<EOF
 SPOOLDIR='/var/spool/mlmmj'
 LISTNAME='${group_name}'
 FQDN='empt.siva'
@@ -161,22 +167,22 @@ CHOWN=''
 ADDCRON='n'
 EOF
 
-        jexec -l -U mlmmj mail mlmmj-make-ml -f /tmp/mlmmj-answers.txt
-        rm -f /empt/jails/mail/tmp/mlmmj-answers.txt
+        jexec -l -U mlmmj smtp mlmmj-make-ml -f /tmp/mlmmj-answers.txt
+        rm -f /empt/jails/smtp/tmp/mlmmj-answers.txt
     fi
 
-    # Set the upstream mail relayhost
-    mail_jid="$(jls -j mail jid)"
-    echo "fe80::eeee:${mail_jid}%lo0" | jexec -l -U mlmmj mail tee "/var/spool/mlmmj/${group_name}/control/relayhost"
+    # Set the upstream smtp relayhost
+    smtp_jid="$(jls -j smtp jid)"
+    echo "fe80::eeee:${smtp_jid}%lo0" | jexec -l -U mlmmj smtp tee "/var/spool/mlmmj/${group_name}/control/relayhost"
 
     # Ensure that users cannot sub/unsub directly from the mailinglist
-    jexec -l -U mlmmj mail touch "/var/spool/mlmmj/${group_name}/control/closedlist"
+    jexec -l -U mlmmj smtp touch "/var/spool/mlmmj/${group_name}/control/closedlist"
 
     # add the new mailing lists to the postfix maps
-    _append_if_missing "${group_name}@empt.siva ${group_name}@localhost.mlmmj" /empt/jails/mail/usr/local/etc/postfix/mlmmj_aliases
-    _append_if_missing "${group_name}@localhost.mlmmj mlmmj:${group_name}" /empt/jails/mail/usr/local/etc/postfix/mlmmj_transport
+    _append_if_missing "${group_name}@empt.siva ${group_name}@localhost.mlmmj" /empt/jails/smtp/usr/local/etc/postfix/mlmmj_aliases
+    _append_if_missing "${group_name}@localhost.mlmmj mlmmj:${group_name}" /empt/jails/smtp/usr/local/etc/postfix/mlmmj_transport
     for m in mlmmj_aliases mlmmj_transport; do
-        jexec -l mail postmap "/usr/local/etc/postfix/${m}"
+        jexec -l smtp postmap "/usr/local/etc/postfix/${m}"
     done
 
     # Create a storage dataset for the group and mount it in corresponding jails
@@ -214,7 +220,7 @@ EOF
     done
 
     for u in ${from_user} ${other_members}; do
-        jexec -l -U mlmmj mail /usr/local/bin/mlmmj-sub -L "/var/spool/mlmmj/${group_name}" -a "${u}@empt.siva" -cfs
+        jexec -l -U mlmmj smtp /usr/local/bin/mlmmj-sub -L "/var/spool/mlmmj/${group_name}" -a "${u}@empt.siva" -cfs
     done
     # ================================================
 

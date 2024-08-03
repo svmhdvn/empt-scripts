@@ -29,7 +29,10 @@ EOF
     echo
 
     _print_check_header "swap memory usage"
-    swap_utilization="$(swapinfo | awk 'END { print(substr($5, 0, length($5)-1)) }')"
+    # if there is no swap memory on the system, the last line will be a 'swapinfo' header.
+    # $5 will be the string 'Capacity', so we use an awk trick (multiply by 1) to convert it into
+    # a numerical 0.
+    swap_utilization="$(swapinfo | awk 'END { print 1*substr($5, 0, length($5)-1) }')"
     if test "${swap_utilization}" -gt 10; then
         echo "PROBLEM: swap memory usage exceeds threshold"
         rc=69 # EX_UNAVAILABLE
