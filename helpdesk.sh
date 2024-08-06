@@ -144,10 +144,8 @@ groups_invite() {
         group_gid="$(jexec -l cifs pw groupnext)"
     fi
 
-    for j in cifs radicale; do
-        # TODO idempotency
-        jexec -l "${j}" pw groupadd -g "${group_gid}" -n "${group_name}" -q || true
-    done
+    # TODO idempotency
+    jexec -l cifs pw groupadd -g "${group_gid}" -n "${group_name}" -q || true
 
     # Create a mailing list for the group if it doesn't already exist
     # ============================================================
@@ -212,12 +210,8 @@ EOF
     # Invite the users to all of the groups' resources
     # ================================================
     other_members="$(echo "${cc}" | _address_list_to_usernames)"
-
     comma_separated_members="$(printf '%s\n%s\n' "${from_user}" "${other_members}" | paste -s -d, -)"
-
-    for j in cifs radicale; do
-        jexec -l "${j}" pw groupmod -n "${group_name}" -m "${comma_separated_members}" -q || true
-    done
+    jexec -l cifs pw groupmod -n "${group_name}" -m "${comma_separated_members}" -q || true
 
     for u in ${from_user} ${other_members}; do
         jexec -l -U mlmmj smtp /usr/local/bin/mlmmj-sub -L "/var/spool/mlmmj/${group_name}" -a "${u}@empt.siva" -cfs
