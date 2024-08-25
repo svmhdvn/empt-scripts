@@ -16,6 +16,10 @@ set -u
 #
 # TODO add SOLUTION text to each PROBLEM
 
+# TODO display percentage and other numerical human metrics in the report:
+# * load average percentages
+# * swap usage
+# * etc.
 _every_minute() {
     _print_check_header "system load average"
     loadavg="$(sysctl -n vm.loadavg | awk '{ print $2*100, $3*100, $4*100 }')"
