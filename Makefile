@@ -14,7 +14,7 @@ install:
 	    $(DESTDIR)$(PREFIX)/etc/periodic
 	install -m 0755 *.sh $(DESTDIR)$(PREFIX)/libexec/empt
 	for d in periodic/*; do \
-	    install -m 0755 $d/* $(DESTDIR)$(PREFIX)/etc/$d; \
+	    install -m 0755 $$d/* $(DESTDIR)$(PREFIX)/etc/$$d; \
 	done
 
 test:
