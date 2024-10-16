@@ -1,24 +1,21 @@
 .POSIX:
 .SUFFIXES:
-.SUFFIXES: .sh
 
 DESTDIR =
 PREFIX = /usr/local
-SOURCES != ls *.sh
-BINS = $(SOURCES:.sh=)
+SOURCES != find . -type f -name '*.sh'
 
-all: $(BINS)
+all:
+	@echo "Nothing to build."
 
-install: $(BINS)
-	mkdir -p $(DESTDIR)$(PREFIX)/libexec/empt
-	install -m 0755 $(BINS) $(DESTDIR)$(PREFIX)/libexec/empt
+install:
+	mkdir -p \
+	    $(DESTDIR)$(PREFIX)/libexec/empt \
+	    $(DESTDIR)$(PREFIX)/etc/periodic
+	install -m 0755 *.sh $(DESTDIR)$(PREFIX)/libexec/empt
+	for d in periodic/*; do \
+	    install -m 0755 $d/* $(DESTDIR)$(PREFIX)/etc/$d \
+	done
 
-test: $(BINS)
-	shellcheck -o all $(BINS)
-
-clean:
-	rm -f $(BINS)
-
-.sh:
-	cp $< $@
-	chmod a+x $@
+test:
+	shellcheck -o all $(SOURCES)

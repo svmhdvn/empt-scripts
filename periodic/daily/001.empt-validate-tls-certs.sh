@@ -43,8 +43,7 @@ if test -r /etc/defaults/periodic.conf; then
     source_periodic_confs
 fi
 
-case "${daily_empt_validate_tls_certs_enable:-YES}" in
-[Yy][Ee][Ss])
-    validate_tls_certs
-    ;;
+case "${daily_empt_validate_tls_certs_enable:-NO}" in
+    [Yy][Ee][Ss]) validate_tls_certs ;;
+    *) ;;
 esac

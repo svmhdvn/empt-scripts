@@ -25,8 +25,7 @@ if test -r /etc/defaults/periodic.conf; then
     source_periodic_confs
 fi
 
-case "${minutely_empt_check_load_avg_enable:-YES}" in
-[Yy][Ee][Ss])
-    check_load_avg
-    ;;
+case "${minutely_empt_check_load_avg_enable:-NO}" in
+    [Yy][Ee][Ss]) check_load_avg ;;
+    *) ;;
 esac

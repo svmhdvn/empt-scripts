@@ -19,8 +19,7 @@ if test -r /etc/defaults/periodic.conf; then
     source_periodic_confs
 fi
 
-case "${daily_empt_check_disk_usage_enable:-YES}" in
-[Yy][Ee][Ss])
-    check_disk_usage
-    ;;
+case "${daily_empt_check_disk_usage_enable:-NO}" in
+    [Yy][Ee][Ss]) check_disk_usage ;;
+    *) ;;
 esac
